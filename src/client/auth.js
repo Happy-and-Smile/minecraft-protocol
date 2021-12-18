@@ -7,7 +7,13 @@ const path = require('path')
 const launcherDataFile = 'launcher_1_accounts.json'
 
 module.exports = async function (client, options) {
-  if (options.sessionPath) options.sessionFile = JSON.parse(await fs.readFile(options.sessionPath), "utf8")
+  if (options.sessionPath) {
+    try {
+      options.sessionFile = JSON.parse(await fs.readFile(options.sessionPath), "utf8")
+    } catch (err) {
+      await fs.writeFile(path.join(options.sessionPath), '{}')
+    }
+  }
   if (!options.profilesFolder && options.profilesFolder !== false) { // not defined, but not explicitly false. fallback to default
     let mcFolderExists = true
     try {
@@ -178,12 +184,12 @@ module.exports = async function (client, options) {
             })
           }
         })
-      } else if (options.sessionFile?.session) {
-        cb(null, options.sessionFile)
       } else {
         // trust that the provided session is a working one
         cb(null, options.session)
       }
+    } else if (options.sessionFile?.session) {
+      cb(null, options.sessionFile)
     } else {
       yggdrasilClient.auth({
         user: options.username,
