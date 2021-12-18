@@ -7,6 +7,7 @@ const path = require('path')
 const launcherDataFile = 'launcher_1_accounts.json'
 
 module.exports = async function (client, options) {
+  if(options.sessionPath) options.sessionFile = JSON.parse(fs.readFileSync(options.sessionPath))
   if (!options.profilesFolder && options.profilesFolder !== false) { // not defined, but not explicitly false. fallback to default
     let mcFolderExists = true
     try {
@@ -48,6 +49,9 @@ module.exports = async function (client, options) {
   if (options.haveCredentials) {
     // make a request to get the case-correct username before connecting.
     const cb = function (err, session) {
+      if(options.sessionFile) {
+        fs.writeFile(options.sessionPath, JSON.stringify(session, null, 4))
+      }
       if (options.profilesFolder) {
         getLauncherProfiles().then((auths) => {
           if (!auths.accounts) auths.accounts = []
