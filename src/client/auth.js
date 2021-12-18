@@ -113,6 +113,12 @@ module.exports = async function (client, options) {
           }
         }
         session.auth = options.auth
+        session.server = options.host
+        if(options.port) {
+          session.server += ':' + options.port
+        } else {
+          session.server += ':25565'
+        }
         options.accessToken = session
         client.emit('session', session)
         options.connect(client)
