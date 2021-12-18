@@ -112,7 +112,7 @@ module.exports = async function (client, options) {
       if (err) {
         client.emit('error', err)
       } else if (session?.mcName || session?.mcname) {
-        client.username = session.mcName
+        client.username = session.mcName || session.mcname
         client.session = {
           selectedProfile: {
             id: session.uuid
