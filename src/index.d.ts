@@ -74,10 +74,11 @@ declare module 'minecraft-protocol' {
 		connect?: (client: Client) => void
 		agent?: Agent
 		fakeHost?: string
-		profilesFolder?: string
+		profilesFolder?: string | false
 		onMsaCode?: (data: MicrosoftDeviceAuthorizationResponse) => void
 		id?: number
-
+		session?: SessionOption
+		validateChannelProtocol?: boolean
 	}
 
 	export class Server extends EventEmitter {
@@ -110,16 +111,18 @@ declare module 'minecraft-protocol' {
 		kickTimeout?: number
 		checkTimeoutInterval?: number
 		'online-mode'?: boolean
-		beforePing?: (response: any, client: Client, callback?: (result: any) => any) => any
+		beforePing?: (response: any, client: Client, callback?: (error: any, result: any) => any) => any
 		beforeLogin?: (client: Client) => void
 		motd?: string
 		maxPlayers?: number
 		keepAlive?: boolean
 		version?: string
+		favicon?: string
 		customPackets?: any
 		errorHandler?: (client: Client, error: Error) => void
 		hideErrors?: boolean
 		agent?: Agent
+		validateChannelProtocol: boolean
 	}
 
 	export interface SerializerOptions {
