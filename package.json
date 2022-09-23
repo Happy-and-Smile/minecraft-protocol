@@ -1,6 +1,6 @@
 {
   "name": "minecraft-protocol",
-  "version": "1.32.0",
+  "version": "1.36.1",
   "description": "Parse and serialize minecraft packets, plus authentication and encryption.",
   "main": "src/index.js",
   "types": "src/index.d.ts",
@@ -44,6 +44,7 @@
     "standard": "^16.0.1"
   },
   "dependencies": {
+    "@types/readable-stream": "^2.3.13",
     "aes-js": "^3.1.2",
     "buffer-equal": "^1.0.0",
     "debug": "^4.3.2",
@@ -59,6 +60,6 @@
     "protodef": "^1.8.0",
     "readable-stream": "^3.0.6",
     "uuid-1345": "^1.0.1",
-    "yggdrasil": "github:Happy-and-Smile/yggdrasil"
+    "yggdrasil": "github:Xeow-ET/yggdrasil"
   }
 }

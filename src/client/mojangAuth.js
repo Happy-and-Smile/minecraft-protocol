@@ -4,16 +4,9 @@ const fs = require('fs').promises
 const mcDefaultFolderPath = require('minecraft-folder-path')
 const path = require('path')
 
-const launcherDataFile = 'launcher_1_accounts.json'
+const launcherDataFile = 'launcher_accounts.json'
 
 module.exports = async function (client, options) {
-  if (options.sessionPath) {
-    try {
-      options.sessionFile = JSON.parse(await fs.readFile(options.sessionPath), "utf8")
-    } catch (err) {
-      await fs.writeFile(path.join(options.sessionPath), '{}')
-    }
-  }
   if (!options.profilesFolder && options.profilesFolder !== false) { // not defined, but not explicitly false. fallback to default
     let mcFolderExists = true
     try {
@@ -24,13 +17,13 @@ module.exports = async function (client, options) {
     options.profilesFolder = mcFolderExists ? mcDefaultFolderPath : '.' // local folder if mc folder doesn't exist
   }
 
-  const yggdrasilClient = yggdrasil({ agent: options.agent, host: options.authServer })
+  const yggdrasilClient = yggdrasil({ agent: options.agent, host: options.authServer || 'https://authserver.mojang.com' })
   const clientToken = options.clientToken || (options.session && options.session.clientToken) || (options.profilesFolder && (await getLauncherProfiles()).mojangClientToken) || UUID.v4().toString().replace(/-/g, '')
   const skipValidation = false || options.skipValidation
   options.accessToken = null
-  options.haveCredentials = !!options.password || !!options.alt || (clientToken != null && options.session != null) || (options.profilesFolder && !!getProfileId(await getLauncherProfiles()))
+  options.haveCredentials = !!options.password || (clientToken != null && options.session != null) || (options.profilesFolder && !!getProfileId(await getLauncherProfiles()))
 
-  async function getLauncherProfiles() { // get launcher profiles
+  async function getLauncherProfiles () { // get launcher profiles
     try {
       return JSON.parse(await fs.readFile(path.join(options.profilesFolder, launcherDataFile), 'utf8'))
     } catch (err) {
@@ -40,12 +33,12 @@ module.exports = async function (client, options) {
     }
   }
 
-  function getProfileId(auths) {
+  function getProfileId (auths) {
     try {
       const lowerUsername = options.username.toLowerCase()
       return Object.keys(auths.accounts).find(key =>
         auths.accounts[key].username.toLowerCase() === lowerUsername ||
-        auths.accounts[key].minecraftProfile.name.toLowerCase() === lowerUsername
+          auths.accounts[key].minecraftProfile.name.toLowerCase() === lowerUsername
       )
     } catch (err) {
       return false
@@ -55,9 +48,6 @@ module.exports = async function (client, options) {
   if (options.haveCredentials) {
     // make a request to get the case-correct username before connecting.
     const cb = function (err, session) {
-      if (options.sessionPath) {
-        fs.writeFile(options.sessionPath, JSON.stringify(session, null, 4))
-      }
       if (options.profilesFolder) {
         getLauncherProfiles().then((auths) => {
           if (!auths.accounts) auths.accounts = []
@@ -92,7 +82,7 @@ module.exports = async function (client, options) {
                   remoteId: oldProfileObj?.remoteId ?? '',
                   username: options.username,
                   localId: profile,
-                  type: (options.auth?.toLowerCase() === 'microsoft' ? 'Xbox' : 'Mojang'),
+                  type: (options.auth?.toLowerCase() === 'mojang' ? 'Mojang' : 'Xbox'),
                   persistent: true
                 }
                 auths.accounts[profile] = newProfileObj
@@ -101,7 +91,7 @@ module.exports = async function (client, options) {
           } catch (ignoreErr) {
             // again, silently fail, just don't save anything
           }
-          fs.writeFile(path.join(options.profilesFolder, launcherDataFile), JSON.stringify(auths, null, 2)).then(() => { }, (ignoreErr) => {
+          fs.writeFile(path.join(options.profilesFolder, launcherDataFile), JSON.stringify(auths, null, 2)).then(() => {}, (ignoreErr) => {
             // console.warn("Couldn't save tokens:\n", err) // not any error, we just don't save the file
           })
         }, (ignoreErr) => {
@@ -111,23 +101,6 @@ module.exports = async function (client, options) {
 
       if (err) {
         client.emit('error', err)
-      } else if (session?.mcName || session?.mcname) {
-        client.username = session.mcName || session.mcname
-        client.session = {
-          selectedProfile: {
-            id: session.uuid
-          }
-        }
-        session.auth = options.auth
-        session.server = options.host
-        if(options.port) {
-          session.server += ':' + options.port
-        } else {
-          session.server += ':25565'
-        }
-        options.accessToken = session
-        client.emit('session', session)
-        options.connect(client)
       } else {
         client.session = session
         client.username = session.selectedProfile.name
@@ -188,14 +161,10 @@ module.exports = async function (client, options) {
         // trust that the provided session is a working one
         cb(null, options.session)
       }
-    } else if (options.sessionFile?.session) {
-      cb(null, options.sessionFile)
     } else {
       yggdrasilClient.auth({
         user: options.username,
         pass: options.password,
-        alt: options.alt,
-        auth: options.auth,
         token: clientToken
       }, cb)
     }

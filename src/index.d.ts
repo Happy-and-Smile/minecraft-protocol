@@ -4,6 +4,8 @@ import { EventEmitter } from 'events';
 import { Socket } from 'net'
 import * as Stream from 'stream'
 import { Agent } from 'http'
+import { Transform } from "readable-stream";
+import { KeyObject } from 'crypto';
 
 type PromiseLike = Promise<void> | void
 
@@ -15,8 +17,10 @@ declare module 'minecraft-protocol' {
 		socket: Socket
 		uuid: string
 		username: string
-		session?: any
+		session?: SessionOption
 		profile?: any
+		deserializer: FullPacketParser
+		serializer: Serializer
 		latency: number
 		customPackets: any
 		protocolVersion: number
@@ -31,10 +35,12 @@ declare module 'minecraft-protocol' {
 		registerChannel(name: string, typeDefinition: any, custom?: boolean): void
 		unregisterChannel(name: string): void
 		writeChannel(channel: any, params: any): void
+		signMessage(message: string, timestamp: BigInt, salt?: number): Buffer
+		verifyMessage(publicKey: Buffer | KeyObject, packet: object): boolean
 		on(event: 'error', listener: (error: Error) => PromiseLike): this
 		on(event: 'packet', handler: (data: any, packetMeta: PacketMeta, buffer: Buffer, fullBuffer: Buffer) => PromiseLike): this
 		on(event: 'raw', handler: (buffer: Buffer, packetMeta: PacketMeta) => PromiseLike): this
-		on(event: 'session', handler: (session: any) => PromiseLike): this
+		on(event: 'session', handler: (session: SessionObject) => PromiseLike): this
 		on(event: 'state', handler: (newState: States, oldState: States) => PromiseLike): this
 		on(event: 'end', handler: (reason: string) => PromiseLike): this
 		on(event: 'connect', handler: () => PromiseLike): this
@@ -51,10 +57,54 @@ declare module 'minecraft-protocol' {
 		once(event: `raw.${string}`, handler: (buffer: Buffer, packetMeta: PacketMeta) => PromiseLike): this
 	}
 
+	class FullPacketParser extends Transform {
+		proto: any
+		mainType: any
+		noErrorLogging: boolean
+		constructor (proto: any, mainType: any, noErrorLogging?: boolean)
+
+		parsePacketBuffer(buffer: Buffer): any
+	}
+
+	class Serializer extends Transform {
+		proto: any
+		mainType: any
+		queue: Buffer
+		constructor(proto: any, mainType: any)
+
+		createPacketBuffer(packet: any): any
+	}
+
+	export interface SessionOption {
+		accessToken: string,
+		/** My be needed for mojang auth. Is send by mojang on username + password auth */
+		clientToken?: string,
+		selectedProfile: SessionProfile
+	}
+
+	export interface SessionObject {
+		accessToken: string,
+		/** My be needed for mojang auth. Is send by mojang on username + password auth */
+		clientToken?: string,
+		selectedProfile: {
+			name: string
+			id: string
+		}
+		availableProfiles?: SessionProfile[]
+		availableProfile?: SessionProfile[]
+	}
+
+	interface SessionProfile {
+		/** Character in game name */
+		name: string
+		/** Character UUID in short form */
+		id: string
+	}
+
 	export interface ClientOptions {
 		username: string
 		port?: number
-		auth?: 'mojang' | 'microsoft'
+		auth?: 'mojang' | 'microsoft' | 'offline' | ((client: Client, options: ClientOptions) => void)
 		password?: string
 		host?: string
 		clientToken?: string
@@ -78,7 +128,9 @@ declare module 'minecraft-protocol' {
 		onMsaCode?: (data: MicrosoftDeviceAuthorizationResponse) => void
 		id?: number
 		session?: SessionOption
-		validateChannelProtocol?: boolean
+		validateChannelProtocol?: boolean,
+		// 1.19+
+		disableChatSigning?: boolean
 	}
 
 	export class Server extends EventEmitter {
@@ -89,6 +141,7 @@ declare module 'minecraft-protocol' {
 		playerCount: number
 		maxPlayers: number
 		motd: string
+		motdMsg?: Object
 		favicon: string
 		close(): void
 		on(event: 'connection', handler: (client: ServerClient) => PromiseLike): this
@@ -114,15 +167,20 @@ declare module 'minecraft-protocol' {
 		beforePing?: (response: any, client: Client, callback?: (error: any, result: any) => any) => any
 		beforeLogin?: (client: Client) => void
 		motd?: string
+		motdMsg?: Object
 		maxPlayers?: number
 		keepAlive?: boolean
-		version?: string
+		version?: string | false
+		fallbackVersion?: string
 		favicon?: string
 		customPackets?: any
 		errorHandler?: (client: Client, error: Error) => void
 		hideErrors?: boolean
 		agent?: Agent
-		validateChannelProtocol: boolean
+		validateChannelProtocol?: boolean
+		// 1.19+
+		// Require connecting clients to have chat signing support enabled
+		enforceSecureProfile?: boolean
 	}
 
 	export interface SerializerOptions {
@@ -198,7 +256,8 @@ declare module 'minecraft-protocol' {
 	}
 
 	export const states: typeof States
-	export const supportedVersions: ['1.7', '1.8', '1.9', '1.10', '1.11.2', '1.12.2', '1.13.2', '1.14.4', '1.15.2', '1.16.5', '1.17.1']
+	export const supportedVersions: string[]
+	export const defaultVersion: string
 
 	export function createServer(options: ServerOptions): Server
 	export function createClient(options: ClientOptions): Client

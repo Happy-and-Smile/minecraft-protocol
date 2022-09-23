@@ -6,8 +6,9 @@ const assert = require('assert')
 const encrypt = require('./client/encrypt')
 const keepalive = require('./client/keepalive')
 const compress = require('./client/compress')
-const auth = require('./client/auth')
+const mojangAuth = require('./client/mojangAuth')
 const microsoftAuth = require('./client/microsoftAuth')
+const altAuth = require("./client/AltAuth")
 const setProtocol = require('./client/setProtocol')
 const play = require('./client/play')
 const tcpDns = require('./client/tcp_dns')
@@ -34,10 +35,29 @@ function createClient (options) {
   const client = new Client(false, version.minecraftVersion, options.customPackets, hideErrors)
 
   tcpDns(client, options)
-  if (options.auth === 'microsoft') {
-    microsoftAuth.authenticate(client, options)
+  if (options.auth instanceof Function) {
+    options.auth(client, options)
   } else {
-    auth(client, options)
+    switch (options.auth) {
+      case 'mojang':
+        console.warn('[deprecated] mojang auth servers no longer accept mojang accounts to login. convert your account.\nhttps://help.minecraft.net/hc/en-us/articles/4403181904525-How-to-Migrate-Your-Mojang-Account-to-a-Microsoft-Account')
+        mojangAuth(client, options)
+        break
+      case 'microsoft':
+        microsoftAuth.authenticate(client, options).catch((err) => client.emit('error', err))
+        break
+      case 'easymc':
+        altAuth(client, options)
+        break
+      case 'mcleaks':
+        altAuth(client, options)
+        break
+      case 'offline':
+      default:
+        client.username = options.username
+        options.connect(client)
+        break
+    }
   }
   if (options.version === false) autoVersion(client, options)
   setProtocol(client, options)

@@ -22,7 +22,8 @@ function createServer (options = {}) {
     maxPlayers: maxPlayersNew = 20,
     version,
     favicon,
-    customPackets
+    customPackets,
+    motdMsg
   } = options
 
   const maxPlayers = options['max-players'] !== undefined ? maxPlayersOld : maxPlayersNew
@@ -38,6 +39,7 @@ function createServer (options = {}) {
   server.mcversion = mcversion
   server.motd = motd
   server.maxPlayers = maxPlayers
+  server.motdMsg = motdMsg
   server.playerCount = 0
   server.onlineModeExceptions = Object.create(null)
   server.favicon = favicon

@@ -15,17 +15,23 @@ automatically logged in and validated against mojang's auth.
  * beforePing : allow customisation of the answer to ping the server does. 
  It takes a function with argument response and client, response is the default json response, and client is client who sent a ping.
  It can take as third argument a callback. If the callback is passed, the function should pass its result to the callback, if not it should return.
+ If the result is `false` instead of a response object then the connection is terminated and no ping is returned to the client.
  * beforeLogin : allow customisation of client before the `success` packet is sent.
  It takes a function with argument client and should be synchronous for the server to wait for completion before continuing execution.
  * motd : default to "A Minecraft server"
+ * motdMsg : A json object of the chat message to use instead of `motd`. Can be build using [prismarine-chat](https://github.com/PrismarineJS/prismarine-chat) and calling .toJSON(). Not used with legacy pings.
  * maxPlayers : default to 20
  * keepAlive : send keep alive packets : default to true
- * version : 1.8 or 1.9 : default to 1.8
+ * version : the version of the server, defaults to the latest version. Set version to `false` to enable dynamic cross version support.
+ * fallbackVersion (optional) : the version that should be used as a fallback, if the client version isn't supported, only works with dynamic cross version support.
+ * favicon (optional) : the favicon to set, base64 encoded
  * customPackets (optional) : an object index by version/state/direction/name, see client_custom_packet for an example
  * errorHandler : A way to override the default error handler for client errors. A function that takes a Client and an error.
  The default kicks the client.
  * hideErrors : do not display errors, default to false
- * agent : a http agent that can be used to set proxy settings for yggdrasil authentication confirmation (see proxy-agent on npm) 
+ * agent : a http agent that can be used to set proxy settings for yggdrasil authentication confirmation (see proxy-agent on npm)
+ * validateChannelProtocol (optional) : whether or not to enable protocol validation for custom protocols using plugin channels for the connected clients. Defaults to true
+ * enforceSecureProfile (optional) : Kick clients that do not have chat signing keys from Mojang (1.19+)
 
 ## mc.Server(version,[customPackets])
 
@@ -34,6 +40,10 @@ Create a server instance for `version` of minecraft.
 ### server.writeToClients(clients, name, params)
 
 Write a packet to all `clients` but encode it only once.
+
+### client.verifyMessage(packet) : boolean
+
+Verifies if player's chat message packet was signed with their Mojang provided key
 
 ### server.onlineModeExceptions
 
@@ -72,6 +82,14 @@ Called when a client connects, but before any login has happened. Takes a
 
 Called when a client is logged in against server. Takes a `Client` parameter.
 
+### `listening` event
+
+Called when the server is listening for connections. This means that the server is ready to accept incoming connections.
+
+### `close` event
+
+Called when the server is no longer listening to incoming connections.
+
 
 ## mc.createClient(options)
 
@@ -80,7 +98,7 @@ Returns a `Client` instance and perform login.
 `options` is an object containing the properties :
  * username
  * port : default to 25565
- * auth : the type of account to use, either `microsoft` or `mojang`. default to 'mojang'
+ * auth : the type of account to use, either `microsoft`, `mojang`, `offline` or `function (client, options) => void`. defaults to 'offline'.
  * password : can be omitted
    * (microsoft account) leave this blank to use device code auth. If you provide
    a password, we try to do username and password auth, but this does not always work.
@@ -88,8 +106,12 @@ Returns a `Client` instance and perform login.
    is blank, and `profilesFolder` is specified, we auth with the tokens there instead.
    If neither `password` or `profilesFolder` are specified, we connect in offline mode.
  * host : default to localhost
- * clientToken : generated if a password is given
- * accessToken : generated if a password or microsoft account is given
+ * session : An object holding clientToken, accessToken and selectedProfile. Generated after logging in using username + password with mojang auth or after logging in using microsoft auth. `clientToken`, `accessToken` and `selectedProfile: {name: '<username>', id: '<selected profile uuid>'}` can be set inside of `session` when using createClient to login with a client and access Token instead of a password. `session` is also emitted by the `Client` instance with the event 'session' after successful authentication. 
+   * clientToken : generated if a password is given or can be set when when using createClient
+   * accessToken : generated if a password or microsoft account is given or can be set when using createBot
+   * selectedProfile : generated if a password or microsoft account is given. Can be set as a object with property `name` and `id` that specifies the selected profile.
+     * name : The selected profiles in game name needed for logging in with access and client Tokens.
+     * id : The selected profiles uuid in short form (without `-`) needed for logging in with access and client Tokens.
  * authServer : auth server, default to https://authserver.mojang.com
  * sessionServer : session server, default to https://sessionserver.mojang.com
  * keepAlive : send keep alive packets : default to true
@@ -111,7 +133,8 @@ Returns a `Client` instance and perform login.
  * onMsaCode(data) : (optional) callback called when signing in with a microsoft account
  with device code auth. `data` is an object documented [here](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code#device-authorization-response)
  * id : a numeric client id used for referring to multiple clients in a server
-
+ * validateChannelProtocol (optional) : whether or not to enable protocol validation for custom protocols using plugin channels. Defaults to true
+ * disableChatSigning (optional) : Don't try obtaining chat signing keys from Mojang (1.19+)
 
 ## mc.Client(isServer,version,[customPackets])
 
@@ -250,6 +273,13 @@ Start emitting channel events of the given name on the client object.
 
 Unregister a channel `name` and send the unregister packet if `custom` is true.
 
+### client.signMessage(message: string, timestamp: BigInt, salt?: number) : Buffer
+
+Generate a signature for a chat message to be sent to server
+
+### client.verifyMessage(publicKey: Buffer | KeyObject, packet) : boolean
+
+Verifies a player chat packet sent by another player against their public key
 
 ## Not Immediately Obvious Data Type Formats
 
@@ -318,6 +348,10 @@ The minecraft protocol states.
 
 The supported minecraft versions.
 
+## mc.defaultVersion
+
+The current default minecraft version.
+
 ## mc.createSerializer({ state = states.HANDSHAKING, isServer = false , version})
 
 Returns a minecraft protocol [serializer](https://github.com/roblabla/ProtoDef#serializerprotomaintype) for these parameters.
@@ -326,5 +360,4 @@ Returns a minecraft protocol [serializer](https://github.com/roblabla/ProtoDef#s
 ## mc.createDeserializer({ state = states.HANDSHAKING, isServer = false, packetsToParse = {"packet": true}, version })
 
 Returns a minecraft protocol [deserializer](https://github.com/roblabla/ProtoDef#parserprotomaintype) for these parameters.
-
 
