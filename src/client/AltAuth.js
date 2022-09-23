@@ -10,7 +10,7 @@ module.exports = async function (client, options) {
     try {
       options.sessionFile = JSON.parse(fs.readFileSync("./cache.json", "utf8"))
     } catch (err) {
-      fs.writeFileSync('./cache.json', '[]')
+      fs.writeFileSync('./cache.json', '[]', "utf-8")
       options.sessionFile = []
     }
   }
@@ -18,13 +18,14 @@ module.exports = async function (client, options) {
   const yggdrasilClient = yggdrasil({ agent: options.agent})
   const skipValidation = false || options.skipValidation
   options.accessToken = null
+  options.haveCredentials = !!options.alt
 
   if (options.alt) {
     // make a request to get the case-correct username before connecting.
-    const cb = function (err, session) {
-      if (options.cache === true && session) {
-        options.sessionFile.push(session)
-        fs.writeFile("./cache.json", JSON.stringify(options.sessionFile, null, 4))
+    const cb = function (err, session, skipWrite) {
+      if (options.cache === true && session && !skipWrite) {
+        options.sessionFile.push({ ...session, alt: options.alt})
+        fs.writeFileSync("./cache.json", JSON.stringify(options.sessionFile, null, 4), "utf-8")
       }
 
       if (err) {
@@ -69,7 +70,7 @@ module.exports = async function (client, options) {
         })
       } else {
         // trust that the provided session is a working one
-        cb(null, options.session)
+        cb(null, options.session, true)
       }
     } else {
       yggdrasilClient.auth({
